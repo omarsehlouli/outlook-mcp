@@ -38,13 +38,16 @@ async function handleAuthenticate(args) {
     };
   }
   
-  // For real authentication, generate an auth URL and instruct the user to visit it
-  const authUrl = `${config.AUTH_CONFIG.authServerUrl}/auth?client_id=${config.AUTH_CONFIG.clientId}`;
-  
+  // For real authentication, generate an auth URL
+  const account = args && args.account ? args.account : '';
+  const accountParam = account ? `&account=${encodeURIComponent(account)}` : '';
+  const authUrl = `${config.AUTH_CONFIG.authServerUrl}/auth?client_id=${config.AUTH_CONFIG.clientId}${accountParam}`;
+
+  const accountMsg = account ? ` for account ${account}` : '';
   return {
     content: [{
       type: "text",
-      text: `Authentication required. Please visit the following URL to authenticate with Microsoft: ${authUrl}\n\nAfter authentication, you will be redirected back to this application.`
+      text: `Authentication required${accountMsg}. Please visit the following URL to authenticate with Microsoft: ${authUrl}\n\nAfter authentication, you will be redirected back to this application.`
     }]
   };
 }
@@ -97,6 +100,10 @@ const authTools = [
         force: {
           type: "boolean",
           description: "Force re-authentication even if already authenticated"
+        },
+        account: {
+          type: "string",
+          description: "Email account to authenticate (e.g., 'sales@domain.com'). Omit for default."
         }
       },
       required: []

@@ -35,7 +35,7 @@ async function handleMoveEmails(args) {
   
   try {
     // Get access token
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
     
     // Parse email IDs
     const ids = emailIds.split(',').map(id => id.trim()).filter(id => id);

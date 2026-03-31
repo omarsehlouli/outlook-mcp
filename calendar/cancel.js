@@ -23,7 +23,7 @@ async function handleCancelEvent(args) {
 
   try {
     // Get access token
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
 
     // Build API endpoint
     const endpoint = `me/events/${eventId}/cancel`;

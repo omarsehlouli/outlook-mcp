@@ -15,7 +15,7 @@ async function handleListFiles(args) {
   const count = args.count || 25;
 
   try {
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
 
     // Build endpoint - root or specific path
     let endpoint;

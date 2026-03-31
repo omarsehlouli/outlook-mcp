@@ -10,6 +10,8 @@ const path = require('path');
 // Load environment variables from .env file
 require('dotenv').config();
 
+const { AccountDB } = require('./auth/account-db');
+
 // Log to console
 console.log('Starting Outlook Authentication Server');
 
@@ -24,22 +26,25 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-// CSRF state store (state -> timestamp, cleaned up periodically)
+// CSRF state store (state -> { timestamp, account })
 const pendingStates = new Map();
 const TEN_MINUTES = 10 * 60 * 1000;
 
-// Periodically clean up expired CSRF states to prevent memory leaks
+// Periodically clean up expired CSRF states
 setInterval(() => {
   const now = Date.now();
-  for (const [key, timestamp] of pendingStates.entries()) {
-    if (now - timestamp > TEN_MINUTES) pendingStates.delete(key);
+  for (const [key, val] of pendingStates.entries()) {
+    if (now - val.timestamp > TEN_MINUTES) pendingStates.delete(key);
   }
-}, 5 * 60 * 1000).unref(); // unref so the timer doesn't prevent process exit
+}, 5 * 60 * 1000).unref();
+
+// Account database
+const accountDB = new AccountDB();
 
 // Authentication configuration
 const AUTH_CONFIG = {
-  clientId: process.env.MS_CLIENT_ID || '', // Set your client ID as an environment variable
-  clientSecret: process.env.MS_CLIENT_SECRET || '', // Set your client secret as an environment variable
+  clientId: process.env.MS_CLIENT_ID || '',
+  clientSecret: process.env.MS_CLIENT_SECRET || '',
   tenantId: process.env.MS_TENANT_ID || 'common',
   authorityHost: (process.env.MS_AUTHORITY_HOST || 'https://login.microsoftonline.com').replace(/\/+$/, ''),
   redirectUri: 'http://localhost:3333/auth/callback',
@@ -47,223 +52,47 @@ const AUTH_CONFIG = {
     'offline_access',
     'User.Read',
     'Mail.Read',
+    'Mail.ReadWrite',
     'Mail.Send',
+    'MailboxSettings.Read',
     'Calendars.Read',
     'Calendars.ReadWrite',
-    'Contacts.Read'
-  ],
-  tokenStorePath: path.join(process.env.HOME || process.env.USERPROFILE, '.outlook-mcp-tokens.json')
+    'Files.Read',
+    'Files.ReadWrite'
+  ]
 };
 
-// Create HTTP server
-const server = http.createServer((req, res) => {
-  const parsedUrl = url.parse(req.url, true);
-  const pathname = parsedUrl.pathname;
-  
-  console.log(`Request received: ${pathname}`);
-  
-  if (pathname === '/auth/callback') {
-    const query = parsedUrl.query;
-
-    // Validate CSRF state parameter
-    if (!query.state || !pendingStates.has(query.state)) {
-      console.error('Invalid or missing OAuth state parameter');
-      res.writeHead(403, { 'Content-Type': 'text/html' });
-      res.end(`
-        <html><head><title>Invalid State</title></head>
-        <body><h1>Authentication Error</h1>
-        <p>Invalid or expired OAuth state parameter. Please try authenticating again.</p></body></html>
-      `);
-      return;
-    }
-    pendingStates.delete(query.state);
-
-    if (query.error) {
-      console.error(`Authentication error: ${query.error}`);
-      res.writeHead(400, { 'Content-Type': 'text/html' });
-      res.end(`
-        <html>
-          <head>
-            <title>Authentication Error</title>
-            <style>
-              body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-              h1 { color: #d9534f; }
-              .error-box { background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; }
-            </style>
-          </head>
-          <body>
-            <h1>Authentication Error</h1>
-            <div class="error-box">
-              <p><strong>Error:</strong> ${escapeHtml(query.error)}</p>
-              <p><strong>Description:</strong> ${escapeHtml(query.error_description || 'No description provided')}</p>
-            </div>
-            <p>Please close this window and try again.</p>
-          </body>
-        </html>
-      `);
-      return;
-    }
-
-    if (query.code) {
-      console.log('Authorization code received, exchanging for tokens...');
-
-      // Exchange code for tokens
-      exchangeCodeForTokens(query.code)
-        .then((tokens) => {
-          console.log('Token exchange successful');
-          res.writeHead(200, { 'Content-Type': 'text/html' });
-          res.end(`
-            <html>
-              <head>
-                <title>Authentication Successful</title>
-                <style>
-                  body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-                  h1 { color: #5cb85c; }
-                  .success-box { background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; }
-                </style>
-              </head>
-              <body>
-                <h1>Authentication Successful!</h1>
-                <div class="success-box">
-                  <p>You have successfully authenticated with Microsoft Graph API.</p>
-                  <p>The access token has been saved securely.</p>
-                </div>
-                <p>You can now close this window and return to Claude.</p>
-              </body>
-            </html>
-          `);
-        })
-        .catch((error) => {
-          console.error(`Token exchange error: ${error.message}`);
-          res.writeHead(500, { 'Content-Type': 'text/html' });
-          res.end(`
-            <html>
-              <head>
-                <title>Token Exchange Error</title>
-                <style>
-                  body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-                  h1 { color: #d9534f; }
-                  .error-box { background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; }
-                </style>
-              </head>
-              <body>
-                <h1>Token Exchange Error</h1>
-                <div class="error-box">
-                  <p>${escapeHtml(error.message)}</p>
-                </div>
-                <p>Please close this window and try again.</p>
-              </body>
-            </html>
-          `);
-        });
-    } else {
-      console.error('No authorization code provided');
-      res.writeHead(400, { 'Content-Type': 'text/html' });
-      res.end(`
-        <html>
-          <head>
-            <title>Missing Authorization Code</title>
-            <style>
-              body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-              h1 { color: #d9534f; }
-              .error-box { background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; }
-            </style>
-          </head>
-          <body>
-            <h1>Missing Authorization Code</h1>
-            <div class="error-box">
-              <p>No authorization code was provided in the callback.</p>
-            </div>
-            <p>Please close this window and try again.</p>
-          </body>
-        </html>
-      `);
-    }
-  } else if (pathname === '/auth') {
-    // Handle the /auth route - redirect to Microsoft's OAuth authorization endpoint
-    console.log('Auth request received, redirecting to Microsoft login...');
-    
-    // Verify credentials are set
-    if (!AUTH_CONFIG.clientId || !AUTH_CONFIG.clientSecret) {
-      res.writeHead(500, { 'Content-Type': 'text/html' });
-      res.end(`
-        <html>
-          <head>
-            <title>Configuration Error</title>
-            <style>
-              body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-              h1 { color: #d9534f; }
-              .error-box { background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; }
-              code { background: #f4f4f4; padding: 2px 4px; border-radius: 4px; }
-            </style>
-          </head>
-          <body>
-            <h1>Configuration Error</h1>
-            <div class="error-box">
-              <p>Microsoft Graph API credentials are not set. Please set the following environment variables:</p>
-              <ul>
-                <li><code>MS_CLIENT_ID</code></li>
-                <li><code>MS_CLIENT_SECRET</code></li>
-              </ul>
-            </div>
-          </body>
-        </html>
-      `);
-      return;
-    }
-    
-    // Generate cryptographically secure state parameter for CSRF protection
-    const state = crypto.randomBytes(32).toString('hex');
-    pendingStates.set(state, Date.now());
-
-    // Build the authorization URL
-    const authParams = {
-      client_id: AUTH_CONFIG.clientId,
-      response_type: 'code',
-      redirect_uri: AUTH_CONFIG.redirectUri,
-      scope: AUTH_CONFIG.scopes.join(' '),
-      response_mode: 'query',
-      state
+/**
+ * Fetch the authenticated user's primary email via Graph API.
+ */
+function getUserEmail(accessToken) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'graph.microsoft.com',
+      path: '/v1.0/me?$select=mail,userPrincipalName',
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${accessToken}` }
     };
-    
-    const authUrl = `${AUTH_CONFIG.authorityHost}/${AUTH_CONFIG.tenantId}/oauth2/v2.0/authorize?${querystring.stringify(authParams)}`;
-    console.log(`Redirecting to: ${authUrl}`);
-    
-    // Redirect to Microsoft's login page
-    res.writeHead(302, { 'Location': authUrl });
-    res.end();
-  } else if (pathname === '/') {
-    // Root path - provide instructions
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(`
-      <html>
-        <head>
-          <title>Outlook Authentication Server</title>
-          <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-            h1 { color: #0078d4; }
-            .info-box { background-color: #e7f6fd; border: 1px solid #b3e0ff; padding: 15px; border-radius: 4px; }
-            code { background: #f4f4f4; padding: 2px 4px; border-radius: 4px; }
-          </style>
-        </head>
-        <body>
-          <h1>Outlook Authentication Server</h1>
-          <div class="info-box">
-            <p>This server is running to handle Microsoft Graph API authentication callbacks.</p>
-            <p>Don't navigate here directly. Instead, use the <code>authenticate</code> tool in Claude to start the authentication process.</p>
-            <p>Make sure you've set the <code>MS_CLIENT_ID</code> and <code>MS_CLIENT_SECRET</code> environment variables.</p>
-          </div>
-          <p>Server is running at http://localhost:3333</p>
-        </body>
-      </html>
-    `);
-  } else {
-    // Not found
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not Found');
-  }
-});
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const body = JSON.parse(data);
+          resolve(body.mail || body.userPrincipalName || null);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
 
+/**
+ * Exchange authorization code for tokens.
+ */
 function exchangeCodeForTokens(code) {
   return new Promise((resolve, reject) => {
     const postData = querystring.stringify({
@@ -274,7 +103,7 @@ function exchangeCodeForTokens(code) {
       grant_type: 'authorization_code',
       scope: AUTH_CONFIG.scopes.join(' ')
     });
-    
+
     const options = {
       hostname: AUTH_CONFIG.authorityHost.replace(/^https?:\/\//, '').split('/')[0],
       path: `/${AUTH_CONFIG.tenantId}/oauth2/v2.0/token`,
@@ -284,29 +113,15 @@ function exchangeCodeForTokens(code) {
         'Content-Length': Buffer.byteLength(postData)
       }
     };
-    
+
     const req = https.request(options, (res) => {
       let data = '';
-      
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      
+      res.on('data', chunk => data += chunk);
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try {
             const tokenResponse = JSON.parse(data);
-            
-            // Calculate expiration time (current time + expires_in seconds)
-            const expiresAt = Date.now() + (tokenResponse.expires_in * 1000);
-            
-            // Add expires_at for easier expiration checking
-            tokenResponse.expires_at = expiresAt;
-            
-            // Save tokens to file with restrictive permissions
-            fs.writeFileSync(AUTH_CONFIG.tokenStorePath, JSON.stringify(tokenResponse, null, 2), { encoding: 'utf8', mode: 0o600 });
-            console.log(`Tokens saved to ${AUTH_CONFIG.tokenStorePath}`);
-            
+            tokenResponse.expires_at = Date.now() + (tokenResponse.expires_in * 1000);
             resolve(tokenResponse);
           } catch (error) {
             reject(new Error(`Error parsing token response: ${error.message}`));
@@ -316,36 +131,205 @@ function exchangeCodeForTokens(code) {
         }
       });
     });
-    
-    req.on('error', (error) => {
-      reject(error);
-    });
-    
+    req.on('error', reject);
     req.write(postData);
     req.end();
   });
 }
 
+/**
+ * Parse JSON body from request.
+ */
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try { resolve(JSON.parse(body)); }
+      catch (e) { reject(new Error('Invalid JSON body')); }
+    });
+    req.on('error', reject);
+  });
+}
+
+/**
+ * Send JSON response.
+ */
+function jsonResponse(res, statusCode, data) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(data, null, 2));
+}
+
+// Create HTTP server
+const server = http.createServer(async (req, res) => {
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname;
+
+  console.log(`Request received: ${req.method} ${pathname}`);
+
+  try {
+    // ===== AUTH ROUTES =====
+
+    if (pathname === '/auth' && req.method === 'GET') {
+      if (!AUTH_CONFIG.clientId || !AUTH_CONFIG.clientSecret) {
+        res.writeHead(500, { 'Content-Type': 'text/html' });
+        res.end(`<html><body><h1>Configuration Error</h1><p>MS_CLIENT_ID and MS_CLIENT_SECRET are not set.</p></body></html>`);
+        return;
+      }
+
+      // Optional: ?account=email to tag which account is being authenticated
+      const accountHint = parsedUrl.query.account || '';
+
+      const state = crypto.randomBytes(32).toString('hex');
+      pendingStates.set(state, { timestamp: Date.now(), account: accountHint });
+
+      const authParams = {
+        client_id: AUTH_CONFIG.clientId,
+        response_type: 'code',
+        redirect_uri: AUTH_CONFIG.redirectUri,
+        scope: AUTH_CONFIG.scopes.join(' '),
+        response_mode: 'query',
+        state
+      };
+
+      // If account hint provided, add login_hint for smoother UX
+      if (accountHint) {
+        authParams.login_hint = accountHint;
+      }
+
+      const authUrl = `${AUTH_CONFIG.authorityHost}/${AUTH_CONFIG.tenantId}/oauth2/v2.0/authorize?${querystring.stringify(authParams)}`;
+      console.log(`Redirecting to Microsoft login (account hint: ${accountHint || 'none'})`);
+
+      res.writeHead(302, { 'Location': authUrl });
+      res.end();
+
+    } else if (pathname === '/auth/callback' && req.method === 'GET') {
+      const query = parsedUrl.query;
+
+      if (!query.state || !pendingStates.has(query.state)) {
+        res.writeHead(403, { 'Content-Type': 'text/html' });
+        res.end(`<html><body><h1>Invalid State</h1><p>Invalid or expired OAuth state. Please try again.</p></body></html>`);
+        return;
+      }
+
+      const stateData = pendingStates.get(query.state);
+      pendingStates.delete(query.state);
+
+      if (query.error) {
+        res.writeHead(400, { 'Content-Type': 'text/html' });
+        res.end(`<html><body><h1>Auth Error</h1><p>${escapeHtml(query.error)}: ${escapeHtml(query.error_description)}</p></body></html>`);
+        return;
+      }
+
+      if (!query.code) {
+        res.writeHead(400, { 'Content-Type': 'text/html' });
+        res.end(`<html><body><h1>Missing Code</h1><p>No authorization code provided.</p></body></html>`);
+        return;
+      }
+
+      console.log('Authorization code received, exchanging for tokens...');
+      const tokens = await exchangeCodeForTokens(query.code);
+
+      // Determine the user's primary email
+      let primaryEmail = stateData.account;
+      if (!primaryEmail) {
+        primaryEmail = await getUserEmail(tokens.access_token);
+      }
+
+      if (primaryEmail) {
+        primaryEmail = primaryEmail.toLowerCase();
+        // Save to account-specific token file
+        const tokenFile = AccountDB.tokenFileForEmail(primaryEmail);
+        fs.writeFileSync(tokenFile, JSON.stringify(tokens, null, 2), { encoding: 'utf8', mode: 0o600 });
+        console.log(`Tokens saved to ${tokenFile} for account ${primaryEmail}`);
+
+        // Auto-register in AccountDB
+        await accountDB.addAccount(primaryEmail, { tokenFile });
+        console.log(`Account ${primaryEmail} registered in accounts database`);
+      }
+
+      // Also save to legacy token path for backward compatibility
+      const legacyPath = path.join(process.env.HOME || process.env.USERPROFILE, '.outlook-mcp-tokens.json');
+      fs.writeFileSync(legacyPath, JSON.stringify(tokens, null, 2), { encoding: 'utf8', mode: 0o600 });
+
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`
+        <html><body>
+          <h1 style="color: #5cb85c;">Authentication Successful!</h1>
+          <p>Account: <strong>${escapeHtml(primaryEmail || 'unknown')}</strong></p>
+          <p>Tokens saved. You can close this window.</p>
+        </body></html>
+      `);
+
+    // ===== ACCOUNT API ROUTES =====
+
+    } else if (pathname === '/accounts' && req.method === 'GET') {
+      await accountDB.load();
+      jsonResponse(res, 200, accountDB.data);
+
+    } else if (pathname === '/accounts/aliases' && req.method === 'POST') {
+      const body = await parseBody(req);
+      if (!body.account || !body.alias) {
+        jsonResponse(res, 400, { error: 'Both "account" and "alias" fields are required' });
+        return;
+      }
+      const result = await accountDB.addAlias(body.account, body.alias);
+      jsonResponse(res, 200, { message: `Alias ${body.alias} added to ${body.account}`, account: result });
+
+    } else if (pathname === '/accounts/aliases' && req.method === 'DELETE') {
+      const body = await parseBody(req);
+      if (!body.account || !body.alias) {
+        jsonResponse(res, 400, { error: 'Both "account" and "alias" fields are required' });
+        return;
+      }
+      const result = await accountDB.removeAlias(body.account, body.alias);
+      jsonResponse(res, 200, { message: `Alias ${body.alias} removed from ${body.account}`, account: result });
+
+    } else if (pathname === '/accounts/default' && req.method === 'POST') {
+      const body = await parseBody(req);
+      if (!body.account) {
+        jsonResponse(res, 400, { error: '"account" field is required' });
+        return;
+      }
+      await accountDB.setDefaultAccount(body.account);
+      jsonResponse(res, 200, { message: `Default account set to ${body.account}` });
+
+    } else if (pathname === '/') {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`
+        <html><body>
+          <h1 style="color: #0078d4;">M365 Authentication Server</h1>
+          <p>Use the <code>authenticate</code> tool in Claude to start auth.</p>
+          <p>API endpoints:</p>
+          <ul>
+            <li><code>GET /auth?account=email</code> — Start OAuth for an account</li>
+            <li><code>GET /accounts</code> — List all accounts and aliases</li>
+            <li><code>POST /accounts/aliases</code> — Add alias {"account":"...", "alias":"..."}</li>
+            <li><code>DELETE /accounts/aliases</code> — Remove alias</li>
+            <li><code>POST /accounts/default</code> — Set default {"account":"..."}</li>
+          </ul>
+        </body></html>
+      `);
+    } else {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not Found');
+    }
+  } catch (error) {
+    console.error(`Error handling ${pathname}:`, error.message);
+    jsonResponse(res, 500, { error: error.message });
+  }
+});
+
 // Start server
 const PORT = 3333;
 server.listen(PORT, () => {
   console.log(`Authentication server running at http://localhost:${PORT}`);
-  console.log(`Waiting for authentication callback at ${AUTH_CONFIG.redirectUri}`);
-  console.log(`Token will be stored at: ${AUTH_CONFIG.tokenStorePath}`);
-  
+  console.log(`Callback URI: ${AUTH_CONFIG.redirectUri}`);
+
   if (!AUTH_CONFIG.clientId || !AUTH_CONFIG.clientSecret) {
-    console.log('\n⚠️  WARNING: Microsoft Graph API credentials are not set.');
-    console.log('   Please set the MS_CLIENT_ID and MS_CLIENT_SECRET environment variables.');
+    console.log('\nWARNING: MS_CLIENT_ID and MS_CLIENT_SECRET are not set.');
   }
 });
 
-// Handle termination
-process.on('SIGINT', () => {
-  console.log('Authentication server shutting down');
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  console.log('Authentication server shutting down');
-  process.exit(0);
-});
+process.on('SIGINT', () => { console.log('Shutting down'); process.exit(0); });
+process.on('SIGTERM', () => { console.log('Shutting down'); process.exit(0); });

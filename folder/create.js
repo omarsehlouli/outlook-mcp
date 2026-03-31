@@ -25,7 +25,7 @@ async function handleCreateFolder(args) {
   
   try {
     // Get access token
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
     
     // Create folder with appropriate parent
     const result = await createMailFolder(accessToken, folderName, parentFolder);

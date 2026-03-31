@@ -12,11 +12,11 @@ const { ensureAuthenticated } = require('../auth');
  * @returns {object} - MCP response
  */
 async function handleDraftEmail(args) {
-  const { to, cc, bcc, subject = '', body = '', importance = 'normal' } = args || {};
+  const { from, to, cc, bcc, subject = '', body = '', importance = 'normal' } = args || {};
 
   try {
-    // Get access token
-    const accessToken = await ensureAuthenticated();
+    // Get access token (resolve from 'from' address if provided)
+    const { accessToken } = await ensureAuthenticated(from || args.account);
 
     // Format recipients only when provided
     const toRecipients = to
@@ -49,6 +49,11 @@ async function handleDraftEmail(args) {
       bccRecipients: bccRecipients.length > 0 ? bccRecipients : undefined,
       importance
     };
+
+    // Add from address if drafting as alias
+    if (from) {
+      messageObject.from = { emailAddress: { address: from } };
+    }
 
     // Create draft message
     const draft = await callGraphAPI(accessToken, 'POST', 'me/messages', messageObject);

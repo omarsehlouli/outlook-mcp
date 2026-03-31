@@ -23,7 +23,7 @@ async function handleCreateFolder(args) {
   }
 
   try {
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
 
     // Build parent folder endpoint
     let endpoint;
@@ -95,7 +95,7 @@ async function handleDeleteItem(args) {
   }
 
   try {
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
 
     // Get item details first (to confirm existence and get name)
     let endpoint;

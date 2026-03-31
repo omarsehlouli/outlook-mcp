@@ -15,7 +15,7 @@ async function handleListFolders(args) {
   
   try {
     // Get access token
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
     
     // Get all mail folders
     const folders = await getAllFoldersHierarchy(accessToken, includeItemCounts);

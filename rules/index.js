@@ -35,7 +35,7 @@ async function handleEditRuleSequence(args) {
   
   try {
     // Get access token
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
     
     // Get all rules
     const rules = await getInboxRules(accessToken);
@@ -97,6 +97,10 @@ const rulesTools = [
         includeDetails: {
           type: "boolean",
           description: "Include detailed rule conditions and actions"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: []
@@ -152,6 +156,10 @@ const rulesTools = [
         sequence: {
           type: "number",
           description: "Order in which the rule is executed (lower numbers run first, default: 100)"
+        },
+        account: {
+          type: "string",
+          description: "Email account to create the rule on (primary email address). Omit for default account."
         }
       },
       required: ["name"]
@@ -171,6 +179,10 @@ const rulesTools = [
         sequence: {
           type: "number",
           description: "New sequence value for the rule (lower numbers run first)"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["ruleName", "sequence"]

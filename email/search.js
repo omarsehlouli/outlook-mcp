@@ -23,7 +23,7 @@ async function handleSearchEmails(args) {
   
   try {
     // Get access token
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
     
     // Resolve the folder path
     const endpoint = await resolveFolderPath(accessToken, folder);
@@ -287,7 +287,11 @@ function formatSearchResults(response) {
     const date = new Date(email.receivedDateTime).toLocaleString();
     const readStatus = email.isRead ? '' : '[UNREAD] ';
     
-    return `${index + 1}. ${readStatus}${date} - From: ${sender.name} (${sender.address})\nSubject: ${email.subject}\nID: ${email.id}\n`;
+    const toAddresses = email.toRecipients
+      ? email.toRecipients.map(r => r.emailAddress.address).join(', ')
+      : '';
+
+    return `${index + 1}. ${readStatus}${date} - From: ${sender.name} (${sender.address})\n   To: ${toAddresses}\n   Subject: ${email.subject}\n   ID: ${email.id}\n`;
   }).join("\n");
   
   // Add search strategy info if available

@@ -24,6 +24,10 @@ const onedriveTools = [
         count: {
           type: "number",
           description: "Number of items to retrieve (default: 25, max: 50)"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: []
@@ -43,6 +47,10 @@ const onedriveTools = [
         count: {
           type: "number",
           description: "Number of results to return (default: 25, max: 50)"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["query"]
@@ -62,6 +70,10 @@ const onedriveTools = [
         path: {
           type: "string",
           description: "Path to the file (alternative to itemId)"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: []
@@ -86,6 +98,10 @@ const onedriveTools = [
           type: "string",
           description: "Behavior when file exists: 'rename' (default), 'replace', or 'fail'",
           enum: ["rename", "replace", "fail"]
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["path", "content"]
@@ -110,6 +126,10 @@ const onedriveTools = [
           type: "string",
           description: "Behavior when file exists: 'rename' (default), 'replace', or 'fail'",
           enum: ["rename", "replace", "fail"]
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["path", "content"]
@@ -139,6 +159,10 @@ const onedriveTools = [
           type: "string",
           description: "Link scope: 'anonymous' (default) or 'organization'",
           enum: ["anonymous", "organization"]
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: []
@@ -158,6 +182,10 @@ const onedriveTools = [
         name: {
           type: "string",
           description: "Name of the new folder"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["name"]
@@ -177,6 +205,10 @@ const onedriveTools = [
         path: {
           type: "string",
           description: "Path to the item (alternative to itemId)"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: []

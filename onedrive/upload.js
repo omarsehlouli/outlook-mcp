@@ -45,7 +45,7 @@ async function handleUpload(args) {
   }
 
   try {
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
 
     // Normalize path
     const normalizedPath = path.replace(/^\/+|\/+$/g, '');

@@ -26,6 +26,10 @@ const calendarTools = [
         endDateTime: {
           type: "string",
           description: "ISO 8601 end date/time for the query range (default: startDateTime + 30 days)"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: []
@@ -45,6 +49,10 @@ const calendarTools = [
         comment: {
           type: "string",
           description: "Optional comment for declining the event"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["eventId"]
@@ -79,6 +87,10 @@ const calendarTools = [
         body: {
           type: "string",
           description: "Optional body content for the event"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["subject", "start", "end"]
@@ -98,6 +110,10 @@ const calendarTools = [
         comment: {
           type: "string",
           description: "Optional comment for cancelling the event"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["eventId"]
@@ -113,6 +129,10 @@ const calendarTools = [
         eventId: {
           type: "string",
           description: "The ID of the event to delete"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["eventId"]

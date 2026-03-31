@@ -23,6 +23,14 @@ const emailTools = [
         count: {
           type: "number",
           description: "Number of emails to retrieve (default: 10, max: 50)"
+        },
+        to: {
+          type: "string",
+          description: "Filter emails by recipient address (e.g., a specific alias like 'support@domain.com'). Only returns emails addressed to this address."
+        },
+        account: {
+          type: "string",
+          description: "Email account to query (primary email address). Omit for default account."
         }
       },
       required: []
@@ -66,6 +74,10 @@ const emailTools = [
         count: {
           type: "number",
           description: "Number of results to return (default: 10, max: 50)"
+        },
+        account: {
+          type: "string",
+          description: "Email account to search (primary email address). Omit for default account."
         }
       },
       required: []
@@ -85,6 +97,10 @@ const emailTools = [
         includeRawHtml: {
           type: "boolean",
           description: "Include raw HTML content (UNSAFE - for debugging only, may contain hidden prompt injection content)"
+        },
+        account: {
+          type: "string",
+          description: "Email account to read from (primary email address). Omit for default account."
         }
       },
       required: ["id"]
@@ -97,6 +113,10 @@ const emailTools = [
     inputSchema: {
       type: "object",
       properties: {
+        from: {
+          type: "string",
+          description: "Email address to send from (primary or alias). Omit to use default account's primary address."
+        },
         to: {
           type: "string",
           description: "Comma-separated list of recipient email addresses"
@@ -141,6 +161,10 @@ const emailTools = [
     inputSchema: {
       type: "object",
       properties: {
+        from: {
+          type: "string",
+          description: "Email address to draft from (primary or alias). Omit to use default account's primary address."
+        },
         to: {
           type: "string",
           description: "Comma-separated list of recipient email addresses"
@@ -184,6 +208,10 @@ const emailTools = [
         isRead: {
           type: "boolean",
           description: "Whether to mark as read (true) or unread (false). Default: true"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["id"]

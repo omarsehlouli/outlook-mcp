@@ -14,7 +14,7 @@ async function handleListRules(args) {
   
   try {
     // Get access token
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
     
     // Get all inbox rules
     const rules = await getInboxRules(accessToken);

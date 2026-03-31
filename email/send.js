@@ -11,7 +11,7 @@ const { ensureAuthenticated } = require('../auth');
  * @returns {object} - MCP response
  */
 async function handleSendEmail(args) {
-  const { to, cc, bcc, subject, body, importance = 'normal', saveToSentItems = true, isHtml } = args;
+  const { from, to, cc, bcc, subject, body, importance = 'normal', saveToSentItems = true, isHtml } = args;
   
   // Validate required parameters
   if (!to) {
@@ -42,8 +42,8 @@ async function handleSendEmail(args) {
   }
   
   try {
-    // Get access token
-    const accessToken = await ensureAuthenticated();
+    // Get access token (resolve from 'from' address if provided)
+    const { accessToken } = await ensureAuthenticated(from || args.account);
     
     // Format recipients
     const toRecipients = to.split(',').map(email => {
@@ -79,20 +79,24 @@ async function handleSendEmail(args) {
                         (body.includes('<html') || body.includes('<HTML')) ? 'html' : 'text';
 
     // Prepare email object
-    const emailObject = {
-      message: {
-        subject,
-        body: {
-          contentType: contentType,
-          content: body
-        },
-        toRecipients,
-        ccRecipients: ccRecipients.length > 0 ? ccRecipients : undefined,
-        bccRecipients: bccRecipients.length > 0 ? bccRecipients : undefined,
-        importance
+    const message = {
+      subject,
+      body: {
+        contentType: contentType,
+        content: body
       },
-      saveToSentItems
+      toRecipients,
+      ccRecipients: ccRecipients.length > 0 ? ccRecipients : undefined,
+      bccRecipients: bccRecipients.length > 0 ? bccRecipients : undefined,
+      importance
     };
+
+    // Add from address if sending as alias
+    if (from) {
+      message.from = { emailAddress: { address: from } };
+    }
+
+    const emailObject = { message, saveToSentItems };
     
     // Make API call to send email
     await callGraphAPI(accessToken, 'POST', 'me/sendMail', emailObject);

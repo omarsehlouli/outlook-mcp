@@ -37,7 +37,7 @@ async function handleUploadLarge(args) {
   }
 
   try {
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
     const contentBuffer = Buffer.from(content);
     const fileSize = contentBuffer.length;
 

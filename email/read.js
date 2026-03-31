@@ -31,7 +31,7 @@ async function handleReadEmail(args) {
 
   try {
     // Get access token
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
 
     // Make API call to get email details
     const endpoint = `me/messages/${encodeURIComponent(emailId)}`;

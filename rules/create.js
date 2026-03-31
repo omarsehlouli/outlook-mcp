@@ -69,7 +69,7 @@ async function handleCreateRule(args) {
   
   try {
     // Get access token
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
     
     // Create rule
     const result = await createInboxRule(accessToken, {

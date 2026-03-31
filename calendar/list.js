@@ -15,7 +15,7 @@ async function handleListEvents(args) {
   
   try {
     // Get access token
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
     
     // Use calendarView endpoint to include expanded recurring event instances
     const startDate = args.startDateTime ? new Date(args.startDateTime) : new Date();

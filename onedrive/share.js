@@ -25,7 +25,7 @@ async function handleShare(args) {
   }
 
   try {
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
 
     // First get the item ID if we only have path
     let resolvedItemId = itemId;

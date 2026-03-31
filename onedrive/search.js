@@ -24,7 +24,7 @@ async function handleSearchFiles(args) {
   }
 
   try {
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
 
     // Use the search endpoint
     const endpoint = `me/drive/search(q='${encodeURIComponent(query)}')`;

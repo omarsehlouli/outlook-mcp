@@ -20,6 +20,10 @@ const folderTools = [
         includeChildren: {
           type: "boolean",
           description: "Include child folders in hierarchy"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: []
@@ -39,6 +43,10 @@ const folderTools = [
         parentFolder: {
           type: "string",
           description: "Optional parent folder name (default is root)"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["name"]
@@ -62,6 +70,10 @@ const folderTools = [
         sourceFolder: {
           type: "string",
           description: "Optional name of the source folder (default is inbox)"
+        },
+        account: {
+          type: "string",
+          description: "Email account (primary email address). Omit for default account."
         }
       },
       required: ["emailIds", "targetFolder"]

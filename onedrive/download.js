@@ -23,7 +23,7 @@ async function handleDownload(args) {
   }
 
   try {
-    const accessToken = await ensureAuthenticated();
+    const { accessToken } = await ensureAuthenticated(args.account);
 
     // Build endpoint - by ID or by path
     let endpoint;
