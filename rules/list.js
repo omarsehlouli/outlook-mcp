@@ -141,16 +141,73 @@ function formatRuleConditions(rule) {
     conditions.push(`Body contains: "${rule.conditions.bodyContains.join(', ')}"`);
   }
   
-  // Has attachment
-  if (rule.conditions?.hasAttachment === true) {
-    conditions.push('Has attachment');
+  // Has attachments
+  if (rule.conditions?.hasAttachments === true) {
+    conditions.push('Has attachments');
   }
-  
+
   // Importance
   if (rule.conditions?.importance) {
     conditions.push(`Importance: ${rule.conditions.importance}`);
   }
-  
+
+  // Sensitivity
+  if (rule.conditions?.sensitivity) {
+    conditions.push(`Sensitivity: ${rule.conditions.sensitivity}`);
+  }
+
+  // Sender contains
+  if (rule.conditions?.senderContains?.length > 0) {
+    conditions.push(`Sender contains: "${rule.conditions.senderContains.join(', ')}"`);
+  }
+
+  // Recipient contains
+  if (rule.conditions?.recipientContains?.length > 0) {
+    conditions.push(`Recipient contains: "${rule.conditions.recipientContains.join(', ')}"`);
+  }
+
+  // Header contains
+  if (rule.conditions?.headerContains?.length > 0) {
+    conditions.push(`Header contains: "${rule.conditions.headerContains.join(', ')}"`);
+  }
+
+  // Body or subject contains
+  if (rule.conditions?.bodyOrSubjectContains?.length > 0) {
+    conditions.push(`Body or subject contains: "${rule.conditions.bodyOrSubjectContains.join(', ')}"`);
+  }
+
+  // Categories
+  if (rule.conditions?.categories?.length > 0) {
+    conditions.push(`Categories: ${rule.conditions.categories.join(', ')}`);
+  }
+
+  // Sent to me / Cc me / etc
+  if (rule.conditions?.sentToMe === true) conditions.push('Sent to me');
+  if (rule.conditions?.sentCcMe === true) conditions.push('Sent CC to me');
+  if (rule.conditions?.sentToOrCcMe === true) conditions.push('Sent to or CC me');
+  if (rule.conditions?.notSentToMe === true) conditions.push('Not sent to me');
+  if (rule.conditions?.sentOnlyToMe === true) conditions.push('Sent only to me');
+
+  // Sent to addresses
+  if (rule.conditions?.sentToAddresses?.length > 0) {
+    const recipients = rule.conditions.sentToAddresses.map(addr => addr.emailAddress?.address).filter(Boolean).join(', ');
+    if (recipients) conditions.push(`Sent to: ${recipients}`);
+  }
+
+  // Message action flag
+  if (rule.conditions?.messageActionFlag) {
+    conditions.push(`Flag: ${rule.conditions.messageActionFlag}`);
+  }
+
+  // Size range
+  if (rule.conditions?.withinSizeRange) {
+    const min = rule.conditions.withinSizeRange.minimumSize;
+    const max = rule.conditions.withinSizeRange.maximumSize;
+    if (min && max) conditions.push(`Size: ${min}-${max} KB`);
+    else if (min) conditions.push(`Size: at least ${min} KB`);
+    else if (max) conditions.push(`Size: at most ${max} KB`);
+  }
+
   return conditions.join('; ');
 }
 
@@ -192,7 +249,34 @@ function formatRuleActions(rule) {
   if (rule.actions?.delete === true) {
     actions.push('Delete');
   }
-  
+
+  // Redirect
+  if (rule.actions?.redirectTo?.length > 0) {
+    const recipients = rule.actions.redirectTo.map(r => r.emailAddress?.address).filter(Boolean).join(', ');
+    if (recipients) actions.push(`Redirect to: ${recipients}`);
+  }
+
+  // Forward as attachment
+  if (rule.actions?.forwardAsAttachmentTo?.length > 0) {
+    const recipients = rule.actions.forwardAsAttachmentTo.map(r => r.emailAddress?.address).filter(Boolean).join(', ');
+    if (recipients) actions.push(`Forward as attachment to: ${recipients}`);
+  }
+
+  // Assign categories
+  if (rule.actions?.assignCategories?.length > 0) {
+    actions.push(`Assign categories: ${rule.actions.assignCategories.join(', ')}`);
+  }
+
+  // Stop processing rules
+  if (rule.actions?.stopProcessingRules === true) {
+    actions.push('Stop processing more rules');
+  }
+
+  // Permanent delete
+  if (rule.actions?.permanentDelete === true) {
+    actions.push('Permanently delete');
+  }
+
   return actions.join('; ');
 }
 

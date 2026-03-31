@@ -20,8 +20,29 @@ async function handleCreateRule(args) {
     bodyOrSubjectContains,
     sentToAddresses,
     hasAttachments,
+    importance,
+    sensitivity,
+    senderContains,
+    recipientContains,
+    headerContains,
+    categories,
+    sentToMe,
+    sentCcMe,
+    sentToOrCcMe,
+    notSentToMe,
+    sentOnlyToMe,
+    messageActionFlag,
+    withinSizeRangeMin,
+    withinSizeRangeMax,
     moveToFolder,
+    copyToFolder,
     markAsRead,
+    markImportance,
+    forwardTo,
+    redirectTo,
+    deleteMessage,
+    stopProcessingRules,
+    assignCategories,
     isEnabled = true,
     sequence
   } = args;
@@ -46,8 +67,8 @@ async function handleCreateRule(args) {
   }
   
   // Validate that at least one condition or action is specified
-  const hasCondition = fromAddresses || containsSubject || bodyContains || bodyOrSubjectContains || sentToAddresses || hasAttachments === true;
-  const hasAction = moveToFolder || markAsRead === true;
+  const hasCondition = fromAddresses || containsSubject || bodyContains || bodyOrSubjectContains || sentToAddresses || hasAttachments === true || importance || sensitivity || senderContains || recipientContains || headerContains || categories || sentToMe === true || sentCcMe === true || sentToOrCcMe === true || notSentToMe === true || sentOnlyToMe === true || messageActionFlag || withinSizeRangeMin || withinSizeRangeMax;
+  const hasAction = moveToFolder || copyToFolder || markAsRead === true || markImportance || forwardTo || redirectTo || deleteMessage === true || stopProcessingRules === true || assignCategories;
   
   if (!hasCondition) {
     return {
@@ -80,8 +101,29 @@ async function handleCreateRule(args) {
       bodyOrSubjectContains,
       sentToAddresses,
       hasAttachments,
+      importance,
+      sensitivity,
+      senderContains,
+      recipientContains,
+      headerContains,
+      categories,
+      sentToMe,
+      sentCcMe,
+      sentToOrCcMe,
+      notSentToMe,
+      sentOnlyToMe,
+      messageActionFlag,
+      withinSizeRangeMin,
+      withinSizeRangeMax,
       moveToFolder,
+      copyToFolder,
       markAsRead,
+      markImportance,
+      forwardTo,
+      redirectTo,
+      deleteMessage,
+      stopProcessingRules,
+      assignCategories,
       isEnabled,
       sequence
     });
@@ -134,8 +176,29 @@ async function createInboxRule(accessToken, ruleOptions) {
       bodyOrSubjectContains,
       sentToAddresses,
       hasAttachments,
+      importance,
+      sensitivity,
+      senderContains,
+      recipientContains,
+      headerContains,
+      categories,
+      sentToMe,
+      sentCcMe,
+      sentToOrCcMe,
+      notSentToMe,
+      sentOnlyToMe,
+      messageActionFlag,
+      withinSizeRangeMin,
+      withinSizeRangeMax,
       moveToFolder,
+      copyToFolder,
       markAsRead,
+      markImportance,
+      forwardTo,
+      redirectTo,
+      deleteMessage,
+      stopProcessingRules,
+      assignCategories,
       isEnabled,
       sequence
     } = ruleOptions;
@@ -217,9 +280,67 @@ async function createInboxRule(accessToken, ruleOptions) {
     }
 
     if (hasAttachments === true) {
-      rule.conditions.hasAttachment = true;
+      rule.conditions.hasAttachments = true;
     }
-    
+
+    if (importance) {
+      rule.conditions.importance = importance;
+    }
+
+    if (sensitivity) {
+      rule.conditions.sensitivity = sensitivity;
+    }
+
+    if (senderContains) {
+      rule.conditions.senderContains = senderContains.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    if (recipientContains) {
+      rule.conditions.recipientContains = recipientContains.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    if (headerContains) {
+      rule.conditions.headerContains = headerContains.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    if (categories) {
+      rule.conditions.categories = categories.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    if (sentToMe === true) {
+      rule.conditions.sentToMe = true;
+    }
+
+    if (sentCcMe === true) {
+      rule.conditions.sentCcMe = true;
+    }
+
+    if (sentToOrCcMe === true) {
+      rule.conditions.sentToOrCcMe = true;
+    }
+
+    if (notSentToMe === true) {
+      rule.conditions.notSentToMe = true;
+    }
+
+    if (sentOnlyToMe === true) {
+      rule.conditions.sentOnlyToMe = true;
+    }
+
+    if (messageActionFlag) {
+      rule.conditions.messageActionFlag = messageActionFlag;
+    }
+
+    if (withinSizeRangeMin || withinSizeRangeMax) {
+      rule.conditions.withinSizeRange = {};
+      if (withinSizeRangeMin) {
+        rule.conditions.withinSizeRange.minimumSize = withinSizeRangeMin;
+      }
+      if (withinSizeRangeMax) {
+        rule.conditions.withinSizeRange.maximumSize = withinSizeRangeMax;
+      }
+    }
+
     // Add actions
     if (moveToFolder) {
       // Get folder ID
@@ -245,7 +366,55 @@ async function createInboxRule(accessToken, ruleOptions) {
     if (markAsRead === true) {
       rule.actions.markAsRead = true;
     }
-    
+
+    if (copyToFolder) {
+      try {
+        const copyFolderId = await getFolderIdByName(accessToken, copyToFolder);
+        if (!copyFolderId) {
+          return {
+            success: false,
+            message: `Copy-to folder "${copyToFolder}" not found. Please specify a valid folder name.`
+          };
+        }
+        rule.actions.copyToFolder = copyFolderId;
+      } catch (folderError) {
+        return {
+          success: false,
+          message: `Error resolving copy-to folder "${copyToFolder}": ${folderError.message}`
+        };
+      }
+    }
+
+    if (markImportance) {
+      rule.actions.markImportance = markImportance;
+    }
+
+    if (forwardTo) {
+      rule.actions.forwardTo = forwardTo.split(',')
+        .map(email => email.trim())
+        .filter(Boolean)
+        .map(email => ({ emailAddress: { address: email } }));
+    }
+
+    if (redirectTo) {
+      rule.actions.redirectTo = redirectTo.split(',')
+        .map(email => email.trim())
+        .filter(Boolean)
+        .map(email => ({ emailAddress: { address: email } }));
+    }
+
+    if (deleteMessage === true) {
+      rule.actions.delete = true;
+    }
+
+    if (stopProcessingRules === true) {
+      rule.actions.stopProcessingRules = true;
+    }
+
+    if (assignCategories) {
+      rule.actions.assignCategories = assignCategories.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
     // Create the rule
     const response = await callGraphAPI(
       accessToken,
